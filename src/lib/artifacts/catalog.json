@@ -1,0 +1,22 @@
+{
+  "react": { "group": "core", "about": "Components and hooks" },
+  "react-dom": { "group": "core", "about": "React DOM utilities" },
+  "react-dom/client": { "group": "core", "about": "React roots" },
+  "react/jsx-runtime": { "group": "core", "about": "JSX runtime" },
+  "react/jsx-dev-runtime": { "group": "core", "about": "JSX development runtime" },
+  "lucide-react": { "group": "icons", "about": "Interface icons" },
+  "three": { "group": "three", "about": "Three.js scenes and geometry" },
+  "three/addons/controls/OrbitControls.js": { "group": "three", "about": "Orbit camera controls" },
+  "three/addons/loaders/GLTFLoader.js": { "group": "three", "about": "glTF scenes and models" },
+  "@react-three/fiber": { "group": "fiber", "about": "Declarative Three.js with React" },
+  "@react-three/drei": { "group": "fiber", "about": "Three.js helpers and controls" },
+  "recharts": { "group": "charts", "about": "Responsive React charts" },
+  "d3": { "group": "data", "about": "Data visualization" },
+  "lodash-es": { "group": "data", "about": "Collection utilities" },
+  "date-fns": { "group": "data", "about": "Date utilities" },
+  "papaparse": { "group": "data", "about": "CSV parsing" },
+  "zod": { "group": "data", "about": "Data validation" },
+  "mathjs": { "group": "math", "about": "Mathematics and expressions" },
+  "marked": { "group": "text", "about": "Markdown rendering" },
+  "katex": { "group": "text", "about": "Mathematical typesetting" }
+}

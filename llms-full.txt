@@ -1,0 +1,226 @@
+# Codefolio (full)
+
+> Executable JavaScript notebooks on a canvas. Notes, code, and results — one continuous document.
+
+A browser-only TanStack Start app. The product is a freeform React Flow canvas of "notebook" nodes, each containing Markdown and JavaScript cells. There is no server, no auth, no database — everything user-visible lives under `src/`, and persistence is `localStorage` via a Zustand store.
+
+This file is the inlined, context-bounded companion to `llms.txt`. Use it when a single fetch is preferable to chasing links.
+
+---
+
+## 1. What the user can do
+
+- Open the desk — a freeform canvas of notebook "cards" the user drags and arranges.
+- Each card holds ordered cells: Markdown notes and JavaScript code.
+- Shift+Enter runs a cell; Cmd/Ctrl+Enter inserts a new cell beneath it.
+- Top-level declarations in a cell carry into later cells (`const`, `let`, `var`, `function`).
+- `@name` in a cell's source becomes a clickable chip that scrolls to the matching cell (see `cell-references.ts`).
+- Cell outputs render inline beneath the cell:
+  - The trailing expression's value goes through `inspect()` (`src/lib/notebook/inspect.ts`).
+  - `console.log/info/warn/error` calls during the run are captured into `output.logs`.
+- A welcome dialog appears for first-time visitors; an appearance dialog lets them pick a theme palette + font pairing.
+- Source-import: drop a folder of `.js` / `.ts` / `.tsx` / `.jsx` / `.mjs` / `.cjs` (or a single file) onto the desk — each file becomes a notebook card with one editable source cell. Reimporting the same path updates the source cell but preserves attached notes.
+- Project export: produces a reproducible ZIP — original source files, generated React entrypoint, Vite config, `package.json`, `codefolio.build.json` with the module graph, and a build smoke test. The Codefolio app uses port 5173 for dev / 4173 for preview; exported projects use 5174 / 5175.
+
+## 2. Repo layout
+
+```
+src/
+  routes/                  TanStack Start file routes
+    __root.tsx             Document shell, mounts <FolioCanvas/>
+    index.tsx              Home (the canvas)
+  components/
+    canvas/                React Flow canvas, notebook node, project preview, desk stack
+    folio/                 Welcome, appearance panel, toaster, save status, confirm dialog
+    notebook/              Cell renderers (code, markdown, image, video, artifact, full notebook)
+    ui/                    Generic Radix + Tailwind primitives
+  lib/
+    artifacts/             Source-graph compiler, project export, project assistant
+      compiler.ts          Source-graph walker + esbuild bundle for source cells
+      project-compiler.ts  Compiles a chosen entry + its reachable graph
+      project-export.ts    Builds the export ZIP
+      project-assistant.ts AI-assisted replacement (libfx/node, optional)
+      templates.ts         Starter Vite + React entrypoint for exported projects
+      catalog.json         Bundled libraries available inside cells
+    notebook/              Notebook runtime
+      store.ts             Zustand store (cells, kernels, autosave)
+      sandbox-kernel.ts    The iframe evaluator
+      kernel-frame.ts      Source loaded into the iframe (built by build-artifacts.mjs)
+      runtime.ts           Kernel state machine (run, queue, replace)
+      inspect.ts           Display helpers (html, md, table)
+      persistence.ts       localStorage + IndexedDB-backed desk storage
+      workspaces.ts        Multi-workspace handling
+      starters.ts          Starter notebooks (Getting started, Sketchbook, …)
+      appearance.ts        Palette + font tokens
+      cell-references.ts   @name reference resolver
+      source.ts            Source-import helpers
+      io.ts                Project import/export wire format
+    error-component.tsx    Root error boundary (mounted via src/router.tsx)
+scripts/
+  build-artifacts.mjs      Rebuilds public/folio-runtime/ (kernel + per-library bundles)
+public/
+  folio-runtime/           Built bundles (regenerated on dev/build)
+  favicon.svg
+```
+
+## 3. Runtime model
+
+### 3.1 Cell evaluation
+
+A cell runs inside a sandboxed iframe (`src/lib/notebook/sandbox-kernel.ts`). The iframe loads `kernel-frame.ts` (built by `scripts/build-artifacts.mjs` → `kernel-<hash>.js`) which sets up a per-notebook JS scope and exposes the cell helpers.
+
+Top-level declarations declared by `const` / `let` / `var` / `function` are harvested into a shared scope (`__folioScope__`) so subsequent cells see them. Block-scoped declarations (`{ const x = … }`) are intentionally not harvested — this matches notebook expectations and avoids surprising leakage.
+
+The cell's `source` is parsed by `@babel/parser`. Reserved names (`__folioScope__`, `__folioLibraries`, `__folioHost__`, etc.) cannot be redeclared.
+
+### 3.2 Output
+
+A run produces a `CellOutput`:
+
+```ts
+type CellOutput = {
+  logs: LogLine[];      // captured console.* output
+  displays: Display[];  // rendered beneath the cell
+};
+
+type LogLine = { level: "log" | "info" | "warn" | "error"; text: string };
+
+type Display =
+  | { kind: "text"; text: string }
+  | { kind: "html"; html: string }      // sanitized via DOMPurify
+  | { kind: "image"; src: string; alt?: string }
+  | { kind: "table"; columns: string[]; rows: string[][] }
+  | { kind: "json"; json: string }
+  | { kind: "error"; message: string; stack?: string };
+```
+
+`inspect(value)` returns a `Display`:
+
+- `string` / `number` / `bigint` / `boolean` / `null` / `undefined` / `symbol` → text
+- `function` → `[Function name]`
+- `HtmlValue` (from `html` tagged template) → html
+- `MdValue` (from `md` tagged template) → html (rendered through `marked`)
+- `TableValue` (from `table(...)`) → table
+- `HTMLCanvasElement` → image (toDataURL)
+- `HTMLImageElement` → image
+- `HTMLElement` → html (outerHTML)
+- `Error` → error
+- `Date` → text (ISO)
+- Array of plain records → table
+- Otherwise → json
+
+### 3.3 Cell helpers
+
+Cells can call:
+
+| Helper     | Purpose                                                   |
+| ---------- | --------------------------------------------------------- |
+| `chart(data, options?)` | Declarative chart (recharts-based).            |
+| `sketch(w, h, fn)`      | `<canvas>` 2D drawing; `fn(ctx)` paints.        |
+| `html\`…\`` (tagged template) | Raw HTML; sanitized through DOMPurify.    |
+| `md\`…\`` (tagged template)   | Markdown; rendered through `marked`.         |
+| `table(data)`            | Tabular data; rendered as a grid.             |
+
+These are exposed via `globalThis.__folioLibraries` populated by the per-group IIFE bundles in `public/folio-runtime/` (`core`, `icons`, `three`, `fiber`, `charts`, `data`, `math`, `text`). The kernel loads these on boot.
+
+### 3.4 Bundled libraries (catalog)
+
+| Module                        | Group   | What it does                            |
+| ----------------------------- | ------- | --------------------------------------- |
+| `react`, `react-dom`, `react/jsx-runtime`, `react/jsx-dev-runtime` | core | Components, hooks, JSX runtimes |
+| `lucide-react`                | icons   | Interface icons                         |
+| `three`, `three/addons/controls/OrbitControls.js`, `three/addons/loaders/GLTFLoader.js` | three | Three.js |
+| `@react-three/fiber`, `@react-three/drei` | fiber | Declarative Three.js with React         |
+| `recharts`                    | charts  | Responsive React charts                 |
+| `d3`, `lodash-es`, `date-fns`, `papaparse`, `zod` | data | Visualization, parsing, validation |
+| `mathjs`                      | math    | Expressions and arithmetic              |
+| `marked`, `katex`             | text    | Markdown rendering, math typesetting    |
+
+To add a new library, append to `src/lib/artifacts/catalog.json` with one of the existing groups and run `npm run artifacts:build`.
+
+## 4. Persistence model
+
+`useFolioStore` (Zustand + `persist` middleware) writes:
+
+- `nodes` and `edges` (the canvas) — debounced by `delay` with a `maxDelay` cap so continuous typing still flushes.
+- appearance (palette + font + custom tokens) — kept separately so users can change look without affecting notebook content.
+- workspace index — multiple canvases can coexist under namespaced keys.
+
+The persistence driver (`src/lib/notebook/persistence.ts`) prefers IndexedDB when available and falls back to `localStorage`. A small migration table is used to coordinate multi-tab edits: the writer reads the latest stored version, writes the new state with `version+1`, and a losing tab sees a conflict and reloads.
+
+## 5. Source import (compiler)
+
+`src/lib/artifacts/compiler.ts` walks the static graph from a chosen entry file:
+
+- Supports `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`.
+- Traces literal `import` and `export from` paths and literal `require('...')` calls.
+- Reports missing files, unsupported packages, dynamic imports, and non-literal `require` calls.
+- Uses esbuild for bundling (server-side, on demand).
+- The result is a single bundle script that the existing sandbox iframe can run.
+
+`scripts/build-artifacts.mjs` produces the runtime libraries (`core`, `icons`, `three`, `fiber`, `charts`, `data`, `math`, `text`) as hashed IIFE bundles under `public/folio-runtime/`, plus a `manifest.json` listing filenames + versions. `predev`/`prebuild` run it automatically.
+
+## 6. Project export
+
+`src/lib/artifacts/project-export.ts` produces a downloadable ZIP:
+
+- The original source files (preserved for tests).
+- A generated React entrypoint + Vite config + `package.json` (pinned from the installed preview libs).
+- `codefolio.build.json` with the chosen module graph.
+- A build smoke test.
+
+Reproducibility rule: the same source and library versions produce the same archive bytes. Extracted projects run with `npm install`, `npm run dev` (port 5174), `npm run build`, `npm run preview` (port 5175). The in-app preview can run literal CommonJS `require`, but exports report such files as build errors because Vite would not reproduce them reliably. Server routes are not synthesized.
+
+## 7. AI assistance (optional)
+
+The project-assistant path uses `libfx/node` on the server. Configure one of:
+
+- `AI_GATEWAY_API_KEY` for AI Gateway.
+- `FX_GATEWAY_CHAT_URL`, `FX_LOCAL_API_KEY`, optionally `FX_LOCAL_MODEL` for a local fx Gateway-compatible chat endpoint.
+
+The agent has no tools; source and error text are bounded; requests time out after 30 seconds. When deterministic compilation fails, the handler asks for one replacement file, compiles again, and presents it for review before applying — proposals only, never automatic changes.
+
+## 8. Conventions
+
+- Strict TypeScript. `tsc --noEmit` must pass.
+- Tailwind v4, entry `src/styles.css` (`@import "tailwindcss";`).
+- Zustand for cross-cutting notebook state.
+- React Query / Router client APIs are imported per feature.
+- Runtime helpers that a cell can call live in `src/lib/notebook/inspect.ts`; new helpers get a test next door.
+- No server-only code in client bundles (`src/router.tsx` and route loaders are fine for server logic; pure browser code stays in components).
+- Don't commit `node_modules/`, `dist/`, or anything under `public/folio-runtime/`.
+- The kernel is single-threaded JS in a sandbox frame — don't bring in another state library or a build step on its runtime path.
+
+## 9. Adding things
+
+### Adding a runtime helper
+
+1. Implement in `src/lib/notebook/inspect.ts` (typed + documented).
+2. Add a focused test in `src/lib/notebook/*.test.ts`.
+3. If the helper needs a third-party lib, add an entry to `src/lib/artifacts/catalog.json` and rebuild via `npm run artifacts:build`.
+
+### Adding a cell kind
+
+1. New renderer in `src/components/notebook/<kind>-cell.tsx`.
+2. Add the kind to `Cell` (`src/lib/notebook/types.ts`) and the store's persist/load paths.
+3. Cover render + persistence in `src/lib/notebook/store.test.ts`.
+
+## 10. Scripts
+
+| Script              | What it does                                        |
+| ------------------- | --------------------------------------------------- |
+| `npm run dev`       | Vite dev server on port 5173                        |
+| `npm run build`     | Production build to `dist/`                         |
+| `npm run build:dev` | Development-mode build                              |
+| `npm run preview`   | Serve the built output                              |
+| `npm run typecheck` | `tsc --noEmit`                                      |
+| `npm test`          | `node --import tsx --test src/lib/{notebook,artifacts}/*.test.ts` |
+| `npm run lint`      | ESLint                                              |
+| `npm run format`    | Prettier                                            |
+| `npm run artifacts:build` | Re-bundle the notebook kernel + library bundles  |
+
+`predev` and `prebuild` automatically run `artifacts:build`.
+
+## 11. License
+
+MIT — Copyright © 2026 Jason Kneen. See [`LICENSE`](./LICENSE).

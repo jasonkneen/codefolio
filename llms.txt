@@ -1,0 +1,115 @@
+# Codefolio
+
+> Executable JavaScript notebooks on a canvas. Notes, code, and results in one continuous document.
+
+A browser-only app where each "page" is a notebook of Markdown cells interleaved with runnable JavaScript cells. Notebooks live on a freeform canvas — drag them around, attach notes, build up a desk of work. The kernel evaluates cells top-to-bottom, persists variables between cells, supports `@name` references, and renders rich return values (HTML, tables, charts, three.js scenes) inline.
+
+There is no server, no auth, no database. Persistence is `localStorage` via a Zustand store.
+
+## What you can do with Codefolio
+
+- **Write & run code in the browser** — Shift+Enter runs a cell; Cmd/Ctrl+Enter inserts a new one.
+- **Carry state between cells** — top-level `const`/`let`/`var` declarations persist; reference earlier cells with `@name`.
+- **Render rich outputs** — return HTML, a `table(...)`, or a chart from a cell and it paints inline beneath the source.
+- **Use bundled libraries** without an import map — `react`, `three`, `@react-three/fiber`, `recharts`, `d3`, `mathjs`, `katex`, `marked`, `lodash-es`, `date-fns`, `papaparse`, `zod`, `lucide-react`.
+- **Import source files** (`.js`/`.ts`/`.tsx`/`.mjs`/`.cjs`/`.jsx`) as notebooks; the compiler traces `import` / `require` paths through the reachable graph and runs the bundle in a sandboxed frame.
+- **Export a project** as a reproducible ZIP with Vite config, source bundle, walkthrough, and smoke test.
+
+## Repo layout
+
+```
+src/
+  routes/                  TanStack Start routes. __root.tsx mounts <FolioCanvas/>.
+  components/
+    canvas/                React Flow canvas, notebook nodes, project preview.
+    folio/                 Welcome, appearance panel, toaster, save status.
+    notebook/              Cell renderers (code, markdown, image, video, artifact).
+    ui/                    Radix + Tailwind primitives.
+  lib/
+    artifacts/             Source-graph compiler, catalog, project export, assistant.
+    notebook/              Notebook runtime — store, kernel, sandbox, helpers, themes.
+    error-component.tsx    Root error boundary.
+scripts/
+  build-artifacts.mjs      Builds public/folio-runtime/ — the kernel + library bundles.
+public/
+  folio-runtime/           Built bundles (regenerated on dev/build).
+  favicon.svg
+```
+
+Key files:
+
+- [`README.md`](./README.md) — user-facing overview, scripts, conventions.
+- [`AGENTS.md`](./AGENTS.md) — contributor / coding-agent notes.
+- [`SOURCE_NOTEBOOKS.md`](./SOURCE_NOTEBOOKS.md) — source-import compiler, project export, AI assistance.
+
+## Kernel contract
+
+A cell runs in an iframe (`src/lib/notebook/sandbox-kernel.ts`). The host injects:
+
+- `chart(data, options?)` — declarative chart (recharts-based).
+- `sketch(width, height, fn)` — `<canvas>` 2D drawing surface.
+- `html` (tagged template) — return raw HTML; sanitized via DOMPurify.
+- `md` (tagged template) — return Markdown; rendered with `marked`.
+- `table(data)` — return tabular data; rendered as a grid.
+- Any catalogued npm module (see below).
+
+Cell output is captured via the trailing expression's `Display`:
+
+```ts
+type Display =
+  | { kind: "text"; text: string }
+  | { kind: "html"; html: string }
+  | { kind: "image"; src: string; alt?: string }
+  | { kind: "table"; columns: string[]; rows: string[][] }
+  | { kind: "json"; json: string }
+  | { kind: "error"; message: string; stack?: string };
+```
+
+`console.log` / `info` / `warn` / `error` are captured into a `LogLine[]` stream on the cell output.
+
+## Persistence model
+
+`useFolioStore` (Zustand + `persist` middleware) writes the canvas (`nodes`, `edges`) and per-workspace appearance to `localStorage` under the desk key. Workspaces are namespaced so multiple canvases coexist. Edits debounce, then flush on a maximum delay. Conflicts between tabs detect via a `_migrations`-style version counter; the loser sees a "your edits are behind" notice.
+
+The runtime helpers (`chart`, `sketch`, `md`, `html`, `table`) are exposed via `globalThis.__folioLibraries` populated by the per-group IIFE bundles in `public/folio-runtime/` (`core`, `icons`, `three`, `fiber`, `charts`, `data`, `math`, `text`).
+
+## Bundled libraries
+
+| Module                       | Group   | What it does                            |
+| ---------------------------- | ------- | --------------------------------------- |
+| `react`, `react-dom`         | core    | Components, hooks, JSX runtime          |
+| `lucide-react`               | icons   | Interface icons                         |
+| `three`, `three/addons/*`    | three   | Three.js scenes, OrbitControls, GLTFLoader |
+| `@react-three/fiber`, `/drei`| fiber   | Declarative Three.js with React         |
+| `recharts`                   | charts  | Responsive React charts                 |
+| `d3`, `lodash-es`, `date-fns`, `papaparse`, `zod` | data | Visualization, parsing, validation |
+| `mathjs`                     | math    | Expressions and arithmetic              |
+| `marked`, `katex`            | text    | Markdown rendering, math typesetting    |
+
+Add a library by appending to `src/lib/artifacts/catalog.json` with one of these group tags, then `npm run artifacts:build`.
+
+## Quick start
+
+```bash
+npm install
+npm run dev          # http://localhost:5173
+npm run typecheck    # tsc --noEmit
+npm test             # node --test src/lib/**/*.test.ts
+npm run build        # production bundle to dist/
+npm run lint
+```
+
+`predev` and `prebuild` automatically run `artifacts:build`, which produces `public/folio-runtime/` — the kernel and per-library bundles the cells run inside.
+
+## Conventions
+
+- Strict TypeScript. `npm run typecheck` must pass.
+- Tailwind v4 entry: `src/styles.css` (`@import "tailwindcss";`).
+- Zustand for cross-cutting notebook state.
+- Runtime helpers that a cell can call live in `src/lib/notebook/inspect.ts`; new helpers get a test next door.
+- No server-only code in client bundles.
+- Don't commit `node_modules/`, `dist/`, or anything under `public/folio-runtime/`.
+
+## Optional
+
+- `llms-full.txt` — single-file inlined version of this document plus full runtime details, intended for context-bounded ingestion.
