@@ -27,6 +27,7 @@ export function createDeskStorage(options: {
   let writing: Promise<void> | undefined;
   let lastState: Desk | undefined;
   let currentKey = "current";
+  const remoteMirrors = new Set<string>();
   const status = (state: SaveStatus["state"], message: string) => options.status({ state, message, recoveryAvailable: recovery !== undefined, conflict });
   const open = () => database ??= new Promise<IDBDatabase>((resolve, reject) => {
     const request = options.indexedDB().open(options.name ?? "folio-desks-v1", 1);
@@ -62,7 +63,7 @@ export function createDeskStorage(options: {
       const request = store.get(key);
       request.onsuccess = () => {
         const savedRevision = typeof request.result?.revision === "string" ? request.result.revision : null;
-        if (!force && savedRevision !== revision) {
+        if (!force && !remoteMirrors.has(key) && savedRevision !== revision) {
           conflict = true;
           failure = new Error("Desk changed in another tab");
           transaction.abort();
@@ -167,6 +168,7 @@ export function createDeskStorage(options: {
         transaction.onabort = () => reject(transaction.error);
       });
     },
+    useRemoteMirror: () => { remoteMirrors.add(currentKey); conflict = false; },
     allowReplacement: () => { writable = true; lastState = undefined; conflict = false; replace = true; },
     discardChanges: () => {
       clearTimeout(timer); clearTimeout(maxTimer); timer = undefined; maxTimer = undefined;

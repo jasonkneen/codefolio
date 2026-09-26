@@ -1,0 +1,1 @@
+{"extends":"../tsconfig.json","compilerOptions":{"types":["node","vite/client"],"lib":["ES2022","DOM"]},"include":["./*.ts","../src/lib/ai/protocol.ts","../src/lib/collaboration/document.ts"],"exclude":["../audit"]}

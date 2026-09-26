@@ -1,0 +1,53 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import * as Y from "yjs";
+import { IDBFactory } from "fake-indexeddb";
+import { WebSocket } from "ws";
+import { WebsocketProvider } from "y-websocket";
+import { startService } from "../../../server/service";
+import { connectRoom, leaveRoom, useCollaboration } from "./client";
+import { deskDocument, readDesk, writeDesk } from "./document";
+import { useFolioStore } from "../notebook/store";
+import { starterNodes } from "../notebook/starters";
+import type { FolioNode } from "../notebook/types";
+async function waitFor(check: () => boolean) { const deadline = Date.now() + 5000; while (!check()) { if (Date.now() > deadline) throw Error("Client binding did not settle"); await new Promise(resolve => setTimeout(resolve, 10)); } }
+test("joining preserves remote content, offline edits survive reconnect, and leaving detaches updates", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "codefolio-binding-test-")); const service = await startService({ port: 0, directory });
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const network = { onLine: true }; const events = new EventTarget();
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: network });
+  Object.assign(globalThis, { indexedDB: new IDBFactory(), window: events });
+  const ownLocation = new URL(`http://127.0.0.1:${service.port}/`);
+  Object.assign(globalThis, { location: ownLocation, history: { replaceState: (_data: unknown, _unused: string, url: string) => { ownLocation.href = new URL(url, ownLocation).href; } } });
+  useFolioStore.persist.setOptions({ storage: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} } });
+  const nodes: FolioNode[] = [{ id: "shared", type: "notebook", position: { x: 0, y: 0 }, data: { title: "Shared only", ref: "shared", cells: [{ id: "cell", kind: "markdown", source: "Shared source", status: "idle", output: null }] } }];
+  const seed = deskDocument({ nodes, edges: [] }); const remoteDoc = new Y.Doc(); let viewer: WebsocketProvider | undefined;
+  try {
+    const response = await fetch(`${ownLocation.origin}/api/rooms`, { method: "POST", body: JSON.stringify({ state: Buffer.from(Y.encodeStateAsUpdate(seed)).toString("base64") }) }); const link = await response.json() as { room: string; token: string };
+    useFolioStore.setState({ nodes: starterNodes(), edges: [], hydrated: true }); assert.ok(useFolioStore.getState().nodes.length > 1);
+    connectRoom(link, "Binding test"); await waitFor(() => useCollaboration.getState().ready);
+    assert.equal(useFolioStore.getState().nodes.length, 1); assert.equal(useFolioStore.getState().nodes[0].data.cells[0].source, "Shared source");
+    viewer = new WebsocketProvider(`ws://127.0.0.1:${service.port}/sync`, link.room, remoteDoc, { params: { token: link.token }, WebSocketPolyfill: WebSocket as any, disableBc: true }); await waitFor(() => Boolean(viewer?.synced));
+    assert.equal(readDesk(remoteDoc).nodes.length, 1);
+    useFolioStore.getState().setCellSource("shared", "cell", "Live edit"); await waitFor(() => readDesk(remoteDoc).nodes[0].data.cells[0].source === "Live edit");
+    network.onLine = false; events.dispatchEvent(new Event("offline"));
+    useFolioStore.getState().setCellSource("shared", "cell", "Live edit offline");
+    const remoteBase = readDesk(remoteDoc); const remoteNext = structuredClone(remoteBase);
+    remoteNext.nodes[0].data.cells[0].source = "remote Live edit"; writeDesk(remoteDoc, remoteNext, remoteBase);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    leaveRoom();
+    await connectRoom(link, "Restored offline");
+    assert.equal(useCollaboration.getState().ready, true);
+    assert.equal(useFolioStore.getState().nodes[0].data.cells[0].source, "Live edit offline");
+    network.onLine = true; events.dispatchEvent(new Event("online"));
+    await waitFor(() => readDesk(remoteDoc).nodes[0].data.cells[0].source === "remote Live edit offline");
+    assert.equal(useFolioStore.getState().nodes[0].data.cells[0].source, "remote Live edit offline");
+    ownLocation.hash = `share=${encodeURIComponent(JSON.stringify(link))}`;
+    leaveRoom(); assert.equal(ownLocation.hash, "");
+    useFolioStore.setState({ nodes: [], edges: [] }); await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(readDesk(remoteDoc).nodes.length, 1); assert.equal(readDesk(remoteDoc).nodes[0].data.cells[0].source, "remote Live edit offline");
+  } finally { leaveRoom(); viewer?.destroy(); remoteDoc.destroy(); seed.destroy(); await service.stop(); await rm(directory, { recursive: true, force: true }); Reflect.deleteProperty(globalThis, "window"); Reflect.deleteProperty(globalThis, "indexedDB"); if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator); else Reflect.deleteProperty(globalThis, "navigator"); Reflect.deleteProperty(globalThis, "location"); Reflect.deleteProperty(globalThis, "history"); }
+});

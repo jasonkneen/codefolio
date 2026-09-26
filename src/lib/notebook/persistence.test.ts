@@ -114,7 +114,8 @@ test("discarding a conflicted edit reloads the saved version without later stale
   await a.driver.close(); await b.driver.close();
 });
 
-test("continuous typing reaches the maximum save delay", async () => {
+test("continuous typing reaches the maximum save delay", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const factory = new IDBFactory();
   let saved = false;
   const writer = createDeskStorage({ indexedDB: () => factory, legacy: () => null, delay: 1000, maxDelay: 20, status: s => { if (s.state === "saved") saved = true; } });
@@ -122,8 +123,11 @@ test("continuous typing reaches the maximum save delay", async () => {
   for (let i = 0; i < 12; i++) {
     const changed = desk(); changed.nodes[0].data.title = String(i);
     await writer.storage.setItem("desk", { state: changed, version: 0 });
-    await new Promise(resolve => setTimeout(resolve, 5));
+    t.mock.timers.tick(5);
+    await new Promise(resolve => setImmediate(resolve));
   }
+  // IndexedDB completes on the event loop; timer scheduling is deterministic.
+  for (let i = 0; i < 100 && !saved; i++) await new Promise(resolve => setImmediate(resolve));
   assert.equal(saved, true);
   await writer.close();
 });
@@ -153,4 +157,15 @@ test("new workspace does not import the old localStorage desk", async () => {
   driver.setInitialKey("new-workspace");
   assert.equal(await driver.storage.getItem("desk"), null);
   await driver.close();
+});
+
+test("remote workspace snapshots are mirrors while local desks retain revision protection", async () => {
+  const factory = new IDBFactory(); const a = setup(null, factory), b = setup(null, factory);
+  await a.driver.storage.getItem("desk"); await b.driver.storage.getItem("desk");
+  a.driver.useRemoteMirror(); b.driver.useRemoteMirror();
+  await a.driver.storage.setItem("desk", { state: desk(), version: 0 }); await a.driver.flush();
+  const changed = desk(); changed.nodes[0].data.title = "Merged remote state";
+  await b.driver.storage.setItem("desk", { state: changed, version: 0 }); await b.driver.flush();
+  assert.equal(b.status().state, "saved");
+  await a.driver.close(); await b.driver.close();
 });

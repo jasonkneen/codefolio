@@ -45,11 +45,11 @@ export function WelcomeGate() {
             </ul>
           </section>
           <section>
-            <h3>Not yet</h3>
+            <h3>Work together</h3>
             <ul>
-              <li>Accounts or cloud save</li>
-              <li>Sharing a desk with someone else</li>
-              <li>Collaboration on a page</li>
+              <li>AI assistance with reviewable cell changes</li>
+              <li>Invitation links for shared desks</li>
+              <li>Live editing and presence on a page</li>
             </ul>
           </section>
         </div>

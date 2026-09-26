@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { NotebookEditor } from "./lazy-editor";
 
 type Props = {
+  nodeId: string;
   cell: Cell;
   editing: boolean;
   onChange: (source: string) => void;
@@ -13,11 +14,11 @@ type Props = {
 };
 
 
-export function MarkdownCell({ cell, editing, onChange, onStartEdit, onStopEdit }: Props) {
+export function MarkdownCell({ nodeId, cell, editing, onChange, onStartEdit, onStopEdit }: Props) {
   if (editing) {
     return (
       <div className="folio-md-edit nodrag nowheel nopan">
-        <NotebookEditor value={cell.source} onChange={onChange} language="markdown" label="Markdown source" autoFocus onBlur={onStopEdit} onRun={onStopEdit} placeholder="Write a note in Markdown" />
+        <NotebookEditor nodeId={nodeId} cellId={cell.id} value={cell.source} onChange={onChange} language="markdown" label="Markdown source" autoFocus onBlur={onStopEdit} onRun={onStopEdit} placeholder="Write a note in Markdown" />
       </div>
     );
   }

@@ -1,3 +1,8 @@
+import { RemoteWorkspace } from "@/components/folio/remote-workspace";
+import { useCollaboration } from "@/lib/collaboration/client";
+import { useProductPanels } from "@/lib/ai/ui";
+import { AssistantPanel } from "@/components/folio/assistant-panel";
+import { SharingPanel } from "@/components/folio/sharing-panel";
 import { useMediaDrop } from "@/components/notebook/use-media-drop";
 import { useSaveStatus } from "@/lib/notebook/persistence";
 import { DeskSaveStatus } from "@/components/folio/desk-save-status";
@@ -119,6 +124,7 @@ function CanvasInner() {
 }
 
 export function FolioCanvas() {
+  const joining = useCollaboration(s => Boolean(s.link) && !s.ready);
   const saveState = useSaveStatus((s) => s.state);
   const focusedNodeId = useFolioStore((s) => s.focusedNodeId);
   const hydrated = useFolioStore((s) => s.hydrated);
@@ -188,12 +194,16 @@ export function FolioCanvas() {
     <>
       <AppearanceSync />
       <DeskSaveStatus />
-      <div className="folio-desk-layer" data-app-ready={hydrated && layout !== "boot" && saveState === "saved"} inert={Boolean(focusedNodeId)} aria-hidden={Boolean(focusedNodeId)} style={{ opacity: focusedNodeId ? 0 : 1, pointerEvents: focusedNodeId ? "none" : undefined }}><WorkspaceSidebar /><div className="folio-workspace-main">{desk}</div></div>
+      <RemoteWorkspace />
+      <div className="folio-desk-layer" data-app-ready={hydrated && layout !== "boot" && saveState === "saved"} inert={Boolean(focusedNodeId) || joining} aria-hidden={Boolean(focusedNodeId)} style={{ opacity: focusedNodeId ? 0 : 1, pointerEvents: focusedNodeId ? "none" : undefined }}><WorkspaceSidebar /><div className="folio-workspace-main">{desk}</div></div>
+      {joining && <div className="folio-sync-wait" role="status"><p>Connecting to shared desk…</p><button type="button" onClick={() => useProductPanels.setState({ sharing: true })}>Open sharing settings</button></div>}
       {focusedNodeId && <FullNotebook nodeId={focusedNodeId} />}
       <WelcomeGate />
       <HelpPanel />
       <ConfirmHost />
       <FolioToaster />
+      <AssistantPanel />
+      <SharingPanel />
     </>
   );
 }

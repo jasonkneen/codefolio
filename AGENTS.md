@@ -6,7 +6,7 @@ This file is read by coding agents (Codex, Claude Code, Cursor, OpenCode, …) a
 
 Codefolio is a single-page TanStack Start app. The product is a freeform canvas of "notebook" nodes, each containing Markdown and JavaScript cells. The interesting work is in `src/lib/notebook/` (kernel + persistence) and `src/lib/artifacts/` (in-browser source bundler for the import/export flow).
 
-There is **no auth, no database, no backend**. Everything user-visible is in `src/`. Persistence is `localStorage` via the Zustand store in `src/lib/notebook/store.ts`.
+Configured workspaces use the remote Yjs service by default. Both rendered desk snapshots and Yjs documents are cached in IndexedDB for offline recovery. The local desk uses IndexedDB via the Zustand store in `src/lib/notebook/store.ts`. The optional Node service in `server/` hosts AI provider processes and capability-based shared rooms; there are no account logins or application database. User-visible UI stays in `src/`. Shared room state is persisted atomically to the service data directory.
 
 ## Repo layout
 
@@ -19,10 +19,14 @@ src/
     notebook/              Cell renderers — code (CodeMirror), markdown, image, video, artifact.
     ui/                    Radix + Tailwind primitives.
   lib/
+    ai/                    Assistant protocol, browser client and proposals.
+    collaboration/         Yjs document model and browser room binding.
     artifacts/             Source-graph compiler, project export, project assistant.
     notebook/              Notebook runtime — store, kernel, sandbox, helpers, themes.
     error-component.tsx    Root error boundary (mounted via src/router.tsx).
+server/                    AI bridge, Yjs WebSocket service, disk persistence and Fly.io config.
 scripts/
+  dev.mjs                  Starts the service and Vite together.
   build-artifacts.mjs      Rebuilds public/folio-runtime/ — the kernel + per-library bundles.
 public/
   folio-runtime/           Built bundles, regenerated on dev/build.
@@ -41,8 +45,8 @@ public/
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
-npm run typecheck    # tsc --noEmit
+npm run dev          # app :5173 and service :1234
+npm run typecheck    # app and server strict TypeScript
 npm run test         # node --test, plus the .test.ts under src/
 npm run lint         # eslint
 ```

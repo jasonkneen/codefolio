@@ -8,3 +8,12 @@ test("workspace index keeps the legacy canvas and validates saved names", () => 
   assert.deepEqual(parseWorkspaceIndex(saved), saved);
   assert.equal(parseWorkspaceIndex({ ...saved, workspaces: [saved.workspaces[0], saved.workspaces[0]] }).workspaces.length, 1);
 });
+
+
+test("workspace updates preserve entries created in another tab and allow explicit removal", async () => {
+  const { mergeWorkspaceIndex } = await import("./workspaces");
+  const original = { activeId: "current", workspaces: [{ id: "current", name: "Local" }] };
+  const remote = { activeId: "room", workspaces: [...original.workspaces, { id: "room", name: "Shared" }] };
+  assert.equal(mergeWorkspaceIndex(original, remote).workspaces.length, 2);
+  assert.equal(mergeWorkspaceIndex(original, remote, "room").workspaces.length, 1);
+});

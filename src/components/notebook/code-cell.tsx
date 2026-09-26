@@ -39,7 +39,7 @@ export function CodeCell({ nodeId, cell, onChange, onRun }: Props) {
       <div className="folio-code-body">
         {editing ? (
           <div className="nodrag nowheel nopan">
-            <NotebookEditor value={cell.source} onChange={onChange} language="javascript" label="Code cell source" autoFocus onBlur={() => setEditing(false)} onRun={onRun} placeholder="Write JavaScript — last expression is shown" />
+            <NotebookEditor nodeId={nodeId} cellId={cell.id} value={cell.source} onChange={onChange} language="javascript" label="Code cell source" autoFocus onBlur={() => setEditing(false)} onRun={onRun} placeholder="Write JavaScript — last expression is shown" />
           </div>
         ) : (
           <CodeSource nodeId={nodeId} cellId={cell.id} source={cell.source} onEdit={() => setEditing(true)} />

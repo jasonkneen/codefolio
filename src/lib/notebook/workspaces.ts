@@ -23,9 +23,18 @@ function readIndex(): WorkspaceIndex {
   catch { return DEFAULT; }
 }
 
-function saveIndex(index: WorkspaceIndex) {
-  localStorage.setItem(INDEX_KEY, JSON.stringify(index));
-  useWorkspaceStore.setState(index);
+export function mergeWorkspaceIndex(incoming: WorkspaceIndex, stored: WorkspaceIndex, removedId?: string): WorkspaceIndex {
+  const workspaces = [...incoming.workspaces, ...stored.workspaces.filter(item => item.id !== removedId && !incoming.workspaces.some(next => next.id === item.id))];
+  if (workspaces.length > 50) throw Error("This browser can hold at most 50 workspaces.");
+  return { ...incoming, workspaces };
+}
+function saveIndex(index: WorkspaceIndex, removedId?: string) {
+  const merged = mergeWorkspaceIndex(index, readIndex(), removedId);
+  localStorage.setItem(INDEX_KEY, JSON.stringify(merged));
+  useWorkspaceStore.setState(merged);
+}
+function currentIndex(): WorkspaceIndex {
+  return { ...readIndex(), activeId: useWorkspaceStore.getState().activeId };
 }
 
 export const useWorkspaceStore = create<WorkspaceIndex>(() => DEFAULT);
@@ -38,6 +47,9 @@ export function loadWorkspaces() {
 
 async function activate(index: WorkspaceIndex) {
   if (useSaveStatus.getState().state === "error") throw Error("Save or export your current workspace before switching.");
+  // Disconnect before clearing the local store, so a workspace switch never deletes a shared room.
+  const { leaveRoom } = await import("../collaboration/client");
+  leaveRoom();
   await deskStorage.selectKey(index.activeId);
   useFolioStore.setState({ nodes: [], edges: [], focusedNodeId: null, hydrated: false });
   saveIndex(index);
@@ -45,14 +57,14 @@ async function activate(index: WorkspaceIndex) {
 }
 
 export async function openWorkspace(id: string) {
-  const index = useWorkspaceStore.getState();
+  const index = currentIndex();
   if (id === index.activeId) return;
   if (!index.workspaces.some(item => item.id === id)) throw Error("Workspace not found.");
   await activate({ ...index, activeId: id });
 }
 
 export async function createWorkspace() {
-  const index = useWorkspaceStore.getState();
+  const index = currentIndex();
   if (index.workspaces.length >= 50) throw Error("This browser can hold at most 50 workspaces.");
   const workspace = { id: crypto.randomUUID(), name: `Workspace ${index.workspaces.length + 1}` };
   await activate({ activeId: workspace.id, workspaces: [...index.workspaces, workspace] });
@@ -62,16 +74,16 @@ export async function createWorkspace() {
 export function renameWorkspace(id: string, name: string) {
   const trimmed = name.trim().slice(0, 80);
   if (!trimmed) return;
-  const index = useWorkspaceStore.getState();
+  const index = currentIndex();
   saveIndex({ ...index, workspaces: index.workspaces.map(item => item.id === id ? { ...item, name: trimmed } : item) });
 }
 
 export async function removeWorkspace(id: string) {
-  const index = useWorkspaceStore.getState();
+  const index = currentIndex();
   if (index.workspaces.length <= 1) throw Error("Keep at least one workspace.");
   if (!index.workspaces.some(item => item.id === id)) return;
   if (id === index.activeId) await openWorkspace(index.workspaces.find(item => item.id !== id)!.id);
   await deskStorage.deleteKey(id);
-  const current = useWorkspaceStore.getState();
-  saveIndex({ ...current, workspaces: current.workspaces.filter(item => item.id !== id) });
+  const current = currentIndex();
+  saveIndex({ ...current, workspaces: current.workspaces.filter(item => item.id !== id) }, id);
 }

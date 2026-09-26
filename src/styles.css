@@ -1583,3 +1583,59 @@
 .folio-chart-track { flex: 1; display: flex; align-items: flex-end; border-bottom: 1px solid var(--color-line); }
 .folio-chart-bar { width: 100%; background: var(--color-forest); border-radius: 2px 2px 0 0; }
 .folio-chart-label { font-size: 11px; color: var(--color-muted); text-align: center; padding-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* Assistant and sharing use the notebook paper palette. */
+@source "../node_modules/streamdown/dist/*.js";
+.folio-assistant, .folio-sharing { position: fixed; z-index: 80; right: 18px; top: 86px; bottom: 24px; width: min(460px, calc(100vw - 36px)); background: var(--color-paper); color: var(--color-ink); border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0 14px 60px #0006; display: flex; flex-direction: column; overflow: hidden; }
+.folio-sharing { bottom: auto; max-height: calc(100dvh - 110px); }
+.folio-panel-heading { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid var(--color-line); }
+.folio-panel-heading h2 { font: 25px var(--font-display); margin-top: 2px; }
+.folio-assistant-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--color-line); }
+.folio-assistant label, .folio-sharing label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--color-ink-soft); }
+.folio-assistant select, .folio-assistant input, .folio-sharing input { min-width: 0; width: 100%; height: 34px; padding: 6px 9px; font-size: 13px; background: var(--color-paper-2); border: 1px solid var(--color-line); border-radius: 5px; color: var(--color-ink); }
+.folio-assistant-settings { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 45%; overflow-y: auto; border-bottom: 1px solid var(--color-line); }
+.folio-assistant-settings p, .folio-sharing-content > p { font-size: 13px; line-height: 1.55; color: var(--color-ink-soft); }
+.folio-assistant-messages { gap: 22px; font-size: 14px; line-height: 1.65; }
+.folio-assistant [data-streamdown] { overflow-wrap: anywhere; }
+.folio-assistant-messages .is-user > div { background: var(--color-paper-2); }
+.folio-assistant-compose { border-top: 1px solid var(--color-line); padding: 12px 16px; }
+.folio-assistant-compose textarea { width: 100%; padding: 10px; resize: vertical; min-height: 70px; max-height: 160px; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-paper-2); font-size: 14px; }
+.folio-assistant-compose > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; }
+.folio-assistant-compose span { font-size: 10px; color: var(--color-muted); }
+.folio-assistant-error { margin: 8px 16px; font-size: 13px; color: var(--color-danger); overflow-wrap: anywhere; }
+.folio-proposal { border: 1px solid var(--color-line); border-radius: 8px; padding: 12px; margin: 10px 0; }
+.folio-proposal h3 { font-weight: 600; font-size: 13px; margin-bottom: 10px; }
+.folio-proposal details { margin-bottom: 12px; font-size: 12px; }
+.folio-proposal summary { cursor: pointer; }
+.folio-proposal pre { overflow: auto; max-height: 220px; background: var(--color-paper-2); padding: 8px; font: 11px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.folio-proposal details p { margin: 8px 0 3px; color: var(--color-muted); }
+.folio-sharing-content { display: flex; flex-direction: column; gap: 16px; padding: 20px; overflow-y: auto; }
+.folio-sharing-join { padding-top: 18px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 12px; }
+.folio-share-status { display: flex; align-items: center; gap: 8px; }
+.folio-peer-list { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.folio-peer-list span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+.folio-presence { display: flex; gap: 4px; padding: 4px 12px; font-size: 10px; color: var(--color-muted); }
+.folio-presence span { border-left: 3px solid; padding-left: 5px; }
+@media (max-width: 720px) { .folio-assistant, .folio-sharing { right: 8px; top: 76px; bottom: 10px; width: calc(100vw - 16px); } .folio-chrome-actions { gap: 2px; } .folio-chrome-actions > button { padding-inline: 7px; } }
+
+.folio-sync-wait { position: fixed; z-index: 75; inset: 80px 0 0; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center; color: var(--color-desk-fg); background: color-mix(in srgb, var(--color-desk) 80%, transparent); }
+.folio-sync-wait button { padding: 8px 12px; border: 1px solid currentColor; border-radius: 6px; }
+@media (max-width: 480px) {
+  .folio-product-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  .folio-chrome-actions .folio-product-action { width: 32px; padding: 0; }
+  .folio-chrome-actions .size-10 { width: 32px; height: 36px; }
+}
+
+.folio-doc { position: relative; }
+.folio-live-names { display:flex; gap:6px; flex-wrap:wrap; padding:4px 12px; font-size:11px; }
+.folio-live-names:empty { display:none; }
+.folio-live-names span { border:1px solid; border-radius:4px; padding:2px 5px; }
+.folio-agent-presence { color:#675784; }
+.folio-remote-pointer { position:absolute; z-index:40; pointer-events:none; display:flex; align-items:flex-start; }
+.folio-remote-pointer span { color:white; border-radius:3px; padding:2px 5px; font:11px sans-serif; white-space:nowrap; }
+.folio-storage-mode { position:fixed; bottom:8px; right:12px; z-index:45; font-size:11px; color:var(--color-muted); pointer-events:none; }
+.folio-remote-caret { border-left:2px solid; position:relative; display:inline; }
+.folio-remote-caret span { position:absolute; left:-2px; bottom:100%; color:white; font:10px sans-serif; padding:1px 4px; white-space:nowrap; border-radius:3px; }
+.folio-agent-cursor { position:absolute; right:8px; top:24px; z-index:35; pointer-events:none; display:flex; color:#675784; }
+.folio-agent-cursor span { background:#675784; color:white; font:11px sans-serif; border-radius:3px; padding:2px 5px; }

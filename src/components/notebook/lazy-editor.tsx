@@ -1,6 +1,8 @@
 import { Component, lazy, Suspense, type ReactNode } from "react";
 
 export type NotebookEditorProps = {
+  nodeId: string;
+  cellId: string;
   value: string;
   onChange: (source: string) => void;
   language: "javascript" | "markdown" | "tsx";

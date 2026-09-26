@@ -1,3 +1,6 @@
+import { useProductPanels } from "@/lib/ai/ui";
+import { useCollaboration } from "@/lib/collaboration/client";
+import { MessageSquare, Users } from "lucide-react";
 import { useSaveStatus } from "@/lib/notebook/persistence";
 import { AppearancePanel } from "@/components/folio/appearance-panel";
 import { useEffect, useRef, useState } from "react";
@@ -11,6 +14,10 @@ import { useFolioUi } from "@/lib/notebook/ui";
 import { ProjectPreview } from "./project-preview";
 
 export function FolioChrome() {
+  const openAssistant = useProductPanels(s => s.openAssistant);
+  const openSharing = useProductPanels(s => s.openSharing);
+  const shared = useCollaboration(s => s.shared);
+  const peerCount = useCollaboration(s => s.peers.length);
   const saveMessage = useSaveStatus((s) => s.message);
   const addNotebook = useFolioStore((s) => s.addNotebook);
   const addSourceFiles = useFolioStore((s) => s.addSourceFiles);
@@ -106,6 +113,8 @@ export function FolioChrome() {
       </div>
       <div className="folio-chrome-actions">
         <AppearancePanel />
+        <Button type="button" variant="desk" className="folio-product-action" onClick={openAssistant}><MessageSquare /><span className="folio-product-label">Assistant</span></Button>
+        <Button type="button" variant="desk" className="folio-product-action" onClick={openSharing}><Users /><span className="folio-product-label">{shared ? `Sharing · ${peerCount + 1}` : "Share"}</span></Button>
         {nodes.some(node => node.data.sourcePath) && <Button type="button" variant="desk" onClick={() => setPreviewOpen(true)}><PanelTop />Canvas preview</Button>}
         <Button type="button" onClick={() => addNotebook()}>
           <FilePlus2 />

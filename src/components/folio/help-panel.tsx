@@ -97,6 +97,11 @@ export function HelpPanel() {
           </section>
 
           <section>
+            <h3>Assistant and sharing</h3>
+            <p>Open Assistant to explain or draft cells. Choose a provider and notebook context, then review proposed source changes before applying them. Applying a proposal does not run code.</p>
+            <p>With Fly storage configured, every workspace saves remotely and keeps a local offline copy. Share creates an invitation to the current workspace. Names, live pointers, editor carets and agent activity show who is working. Switching workspaces disconnects the current room; reopening reconnects it. Notebook outputs and execution stay on your device.</p>
+          </section>
+          <section>
             <h3>This beta</h3>
             <p>
               Pages live in this browser, not in an account. The kernel runs your JavaScript here, in the page.

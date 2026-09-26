@@ -88,3 +88,16 @@ test("canvas measurements and selection do not create persisted desk edits", () 
   useFolioStore.getState().setTitle("a", "A real edit");
   assert.notEqual(partialize(useFolioStore.getState()).nodes, before.nodes);
 });
+
+test("shared source edits invalidate local execution without replacing unrelated results", async () => {
+  const { applySharedDesk } = await import("./store");
+  const node = (id: string): FolioNode => ({ id, type: "notebook", position: { x: 0, y: 0 }, data: { title: id, ref: id, cells: [{ id: `${id}-cell`, kind: "code", source: "1", output: null, status: "idle" }] } });
+  useFolioStore.getState().replaceDesk([node("sharedA"), node("sharedB")], []);
+  await useFolioStore.getState().runAll("sharedA"); await useFolioStore.getState().runAll("sharedB");
+  const original = structuredClone(useFolioStore.getState().nodes);
+  const incoming = structuredClone(original); incoming[0].data.cells[0].source = "2";
+  applySharedDesk({ nodes: incoming, edges: [] });
+  const latest = useFolioStore.getState().nodes;
+  assert.equal(latest[0].data.cells[0].status, "idle"); assert.equal(latest[0].data.cells[0].stale, true); assert.equal(latest[0].data.cells[0].output, null);
+  assert.deepEqual(latest[1].data.cells[0].output, original[1].data.cells[0].output); assert.equal(latest[1].data.cells[0].status, "ok");
+});

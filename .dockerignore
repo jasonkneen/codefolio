@@ -1,0 +1,7 @@
+node_modules
+dist
+.git
+audit
+.codefolio-data
+.env*
+public/folio-runtime

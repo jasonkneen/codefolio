@@ -29,3 +29,10 @@ coverage/
 # Local scratch
 .tmp/
 .cache/
+
+# Shared room state
+.codefolio-data/
+/audit
+
+# Private deployment configuration
+/server/fly.local.toml

@@ -1,3 +1,5 @@
+import { LivePresence, AgentCellPresence } from "./live-presence";
+import { updatePresence } from "@/lib/collaboration/client";
 import { useMediaDrop } from "./use-media-drop";
 import { VideoCell } from "./video-cell";
 import { CellBinding } from "./cell-binding";
@@ -20,6 +22,7 @@ type Props = {
 };
 
 export function NotebookDocument({ nodeId, fullView = false }: Props) {
+  const lastPointer = useRef(0);
   const mediaDrop = useMediaDrop(nodeId);
   const node = useFolioStore((s) => s.nodes.find((n) => n.id === nodeId));
   const focusId = useFolioStore((s) => s.focusedNodeId);
@@ -91,13 +94,22 @@ export function NotebookDocument({ nodeId, fullView = false }: Props) {
   return (
     <div className="folio-doc nowheel nopan" {...mediaDrop} onKeyDown={onKeyDown}
       onPointerEnter={updateControlProximity}
-      onPointerMove={updateControlProximity}
+      onPointerMove={event => {
+        updateControlProximity(event);
+        if (Date.now() - lastPointer.current < 50) return;
+        lastPointer.current = Date.now();
+        const rect = event.currentTarget.getBoundingClientRect();
+        updatePresence("nodeId", nodeId);
+        updatePresence("pointer", { nodeId, x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) });
+      }}
       onPointerLeave={event => {
+        updatePresence("pointer", null);
         proximitySample.current = 0;
         event.currentTarget.querySelectorAll<HTMLElement>(".folio-cell").forEach(cell => cell.style.setProperty("--cell-control-opacity", "0"));
         event.currentTarget.querySelectorAll<HTMLElement>(".folio-input-row").forEach(row => row.style.setProperty("--input-control-opacity", "0"));
       }}
     >
+      <LivePresence nodeId={nodeId} />
       <header className="notebook-drag-handle folio-doc-head">
         <div className="folio-doc-id">
           {titleEditing ? (
@@ -184,6 +196,7 @@ export function NotebookDocument({ nodeId, fullView = false }: Props) {
         <InsertRule onInsert={(kind) => insertCell(nodeId, null, kind)} />
         {data.cells.map((cell) => (
           <section key={cell.id} className="folio-cell" data-cell-id={cell.id}>
+              <AgentCellPresence nodeId={nodeId} cellId={cell.id} />
             {data.cells.length > 1 && <button
               type="button"
               className="folio-cell-delete nodrag nopan"
@@ -205,6 +218,7 @@ export function NotebookDocument({ nodeId, fullView = false }: Props) {
               <ImageCell image={cell.image} onChange={(image) => setCellImage(nodeId, cell.id, image)} />
             ) : cell.kind === "markdown" ? (
               <MarkdownCell
+                nodeId={nodeId}
                 cell={cell}
                 editing={editingMd === cell.id}
                 onChange={(source) => setCellSource(nodeId, cell.id, source)}

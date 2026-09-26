@@ -516,3 +516,26 @@ export async function resolveArtifactInputs(inputs: ArtifactInput[], nodes = use
   if (JSON.stringify(result).length > 8_000_000) throw Error('Artifact inputs exceed 8 MB. Use smaller values.');
   return result;
 }
+
+/** Receive shared content without sharing execution or resetting unchanged kernels. */
+export function applySharedDesk(desk: { nodes: FolioNode[]; edges: FolioEdge[] }) {
+  const current = useFolioStore.getState();
+  const changed: { nodeId: string; cellId: string }[] = [];
+  const nodes = desk.nodes.map(node => {
+    const before = current.nodes.find(n => n.id === node.id);
+    let cells = node.data.cells.map(cell => {
+      const old = before?.data.cells.find(c => c.id === cell.id);
+      if (old && old.source === cell.source && old.kind === cell.kind && old.name === cell.name && JSON.stringify(old.references) === JSON.stringify(cell.references) && JSON.stringify(old.inputs) === JSON.stringify(cell.inputs) && JSON.stringify(old.image) === JSON.stringify(cell.image) && JSON.stringify(old.video) === JSON.stringify(cell.video)) return { ...cell, output: old.output, status: old.status, stale: old.stale };
+      changed.push({ nodeId: node.id, cellId: cell.id });
+      return { ...cell, output: null, status: "idle" as const, stale: true };
+    });
+    for (const old of before?.data.cells ?? []) if (!cells.some(cell => cell.id === old.id)) changed.push({ nodeId: node.id, cellId: old.id });
+    if (changed.some(change => change.nodeId === node.id) || (before && before.data.ref !== node.data.ref)) {
+      invalidateKernel(node.id);
+      cells = cells.map(cell => cell.kind === "code" || cell.kind === "artifact" ? { ...cell, status: "idle" as const, stale: true } : cell);
+    }
+    return { ...node, selected: before?.selected, measured: before?.measured, data: { ...node.data, cells } };
+  });
+  for (const old of current.nodes) if (!nodes.some(node => node.id === old.id)) invalidateKernel(old.id);
+  useFolioStore.setState({ nodes: markDependents(nodes, changed), edges: desk.edges, focusedNodeId: nodes.some(node => node.id === current.focusedNodeId) ? current.focusedNodeId : null });
+}

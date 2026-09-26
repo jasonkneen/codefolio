@@ -10,6 +10,7 @@ export default tseslint.config(
   {
     ignores: [
       "dist/**",
+      "audit/migrated-code/**",
       "public/folio-runtime/**",
       "node_modules/**",
       "src/routeTree.gen.ts",
