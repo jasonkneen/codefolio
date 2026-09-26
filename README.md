@@ -1,8 +1,12 @@
+
+
+
 # Codefolio
 
 > Executable JavaScript notebooks on a canvas. Notes, code, and results — one continuous document.
 
-<img width="50%" height="50%" alt="Screenshot 2026-09-25 at 18 43 07" src="https://github.com/user-attachments/assets/789d808d-a05b-4a53-b239-0bb95d2418cd" />
+[<img width="50%" height="50%" alt="Screenshot 2026-09-25 at 18 43 07" src="https://github.com/user-attachments/assets/789d808d-a05b-4a53-b239-0bb95d2418cd" />](https://github.com/user-attachments/assets/aefe8073-44c0-49e1-80ae-a5b4bfd537a2
+)
 
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
